@@ -3,10 +3,25 @@
 
 #include <regex.h>
 
-typedef enum { INT, OPERATOR, WHITESPACE, UNIT } token_t;
+typedef enum { INT, OPERATOR, WHITESPACE, UNIT } token_type_t;
+
+typedef struct
+{
+    token_type_t token_type;
+    char* begin;
+    char* end;
+} token_t;
+
+typedef struct
+{
+    token_t *buffer;
+    int buffer_reserve;
+    int buffer_len;
+} token_queue_t;
 
 typedef struct 
 {
+    token_queue_t token_queue;
     char* build_buffer;
     int build_buffer_reserve;
     int build_buffer_len;

@@ -40,35 +40,97 @@ int ensure_buffer_size(char **buffer, int* size_ptr, int new_size)
     return ERR_SUCCESS;
 }
 
-int pop_back_buffer(char* buffer, int len, int pops)
+int ensure_token_queue_size(token_t **queue, int* size_ptr, int new_size)
 {
-    for (int i = 0; i < len; ++i)
+    int min_size = 20;
+    float size_alloc_factor = 1.5f;
+    int size = *size_ptr;
+
+    if (*queue == NULL)
     {
-        buffer[i] = buffer[i + pops];
+        *queue = (token_t*)malloc(min_size * sizeof(token_t));
+        if (*queue == NULL)
+        {
+            return ERR_MALLOC_FAILED;
+        }
+
+        *size_ptr = min_size;
+        return ERR_SUCCESS;
     }
+    if (new_size > size)
+    {
+        int alloc_size = new_size * size_alloc_factor * sizeof(token_t);
+        token_t *ptr = (token_t*)malloc(alloc_size);
+        if (ptr == NULL)
+        {
+            *size_ptr = 0;
+            return ERR_MALLOC_FAILED;
+        }
+        memcpy(ptr, *queue, size);
+        free(*queue); 
+        *queue = ptr;
+        *size_ptr = alloc_size;
+    }
+    return ERR_SUCCESS;
+}
+
+int push_token(token_queue_t* token_queue, token_t token)
+{
+    int ensure = ensure_token_queue_size(&token_queue->buffer, 
+            &token_queue->buffer_reserve, 
+            token_queue->buffer_len + 1);
+    if (ensure != ERR_SUCCESS)
+    {
+        return ensure;    
+    }
+
+    token_queue->buffer[token_queue->buffer_len] = token;
+    token_queue->buffer_len++;
     return ERR_SUCCESS;
 }
 
 int process_buffer(token_state_t* state)
 {
     regmatch_t match;
-    int consumed = -1;
-    while(consumed != 0)
+    char* buffer_begin = state->build_buffer;
+    char* buffer_end = buffer_begin + state->build_buffer_len - 1;
+    printf("processing buffer with len %ld\n", buffer_end - buffer_begin);
+    while(buffer_begin != buffer_end)
     {
-        consumed = 0;
-        int reti = regexec(&state->int_regex, state->build_buffer, 1, &match, 0) ;
-        int retw = regexec(&state->whitespace_regex, state->build_buffer, 1, &match, 0) ;
-        if (!reti)
+        token_type_t token_type;
+        if (!regexec(&state->int_regex, buffer_begin, 1, &match, 0))
         {
-            consumed = match.rm_eo;
+            printf("int");
+            token_type = INT;
         }
-        if (!retw)
+        else if (!regexec(&state->whitespace_regex, buffer_begin, 1, &match, 0))
         {
-            consumed = match.rm_eo;
+            printf("whitespace");
+            token_type = WHITESPACE;
         }
-        printf("Consumed: %d\n", consumed);
-        pop_back_buffer(state->build_buffer, state->build_buffer_len, consumed);
-        printf("After: %s\n", state->build_buffer);
+        else if (!regexec(&state->operator_regex, buffer_begin, 1, &match, 0))
+        {
+            printf("operator");
+            token_type = OPERATOR;
+        }
+        else
+        {
+            printf("Unexpected token at %ld", buffer_end - buffer_begin);
+            return ERR_UNEXPECTED_TOKEN;
+        }
+        
+        token_t token;
+        token.begin = buffer_begin;
+        buffer_begin += match.rm_eo;
+        token.end = buffer_begin;
+        token.token_type = token_type;
+
+        printf("Consumed: %d, begin: %ld end: %ld\n", 
+                match.rm_eo, 
+                token.begin - state->build_buffer,
+                token.end - state->build_buffer);
+
+        push_token(&state->token_queue, token);
     }    
 
     return ERR_SUCCESS;
@@ -83,15 +145,25 @@ int token_init(token_state_t **state)
     }
     (*state)->build_buffer_reserve = 0;
     (*state)->build_buffer_len = 0;
+    (*state)->token_queue.buffer = NULL;
+    (*state)->token_queue.buffer_len = 0;
+    (*state)->token_queue.buffer_reserve = 0;
+    {
+        int ensure = ensure_token_queue_size(&(*state)->token_queue.buffer, 
+            &((*state)->token_queue).buffer_reserve, 
+            0);
+        if(ensure != ERR_SUCCESS)
+        {
+            return ensure;
+        }
+    }
 
     const char* int_regex_str = "^[0-9][0-9]*";
-    const char* operator_regex_str = "^(+|-|*|/)";
+    const char* operator_regex_str = "^[\\+\\-\\/\\%]\\|[*]";
     const char* whitespace_regex_str = "^[ \t\n\r\f\v][ \t\n\r\f\v]*";
-    const char* unit_regex_str = "^\\(|\\)s";
     int reti = regcomp(&(*state)->int_regex, int_regex_str, 0);
     int reto = regcomp(&(*state)->operator_regex, operator_regex_str, 0);
     int retw = regcomp(&(*state)->whitespace_regex, whitespace_regex_str, 0);
-    int retu = regcomp(&(*state)->unit_regex, unit_regex_str, 0);
 
     if (reti)
     {
@@ -105,18 +177,15 @@ int token_init(token_state_t **state)
     {
         printf("failed to compile whitespace regex: %d.\n", retw);
     }
-    if (retu)
-    {
-        printf("failed to compile unit regex: %d.\n", retu);
-    }
 
     int ensure = ensure_buffer_size(&(*state)->build_buffer, 
             &(*state)->build_buffer_reserve, 1);
     if(ensure != ERR_SUCCESS)
     {
-        return ERR_MALLOC_FAILED;
+        return ensure;
     }
-    (*state)->build_buffer[0] = '\n';
+    (*state)->build_buffer[0] = '\0';
+    (*state)->build_buffer_len = 1;
 
     return ERR_SUCCESS;
 }
@@ -124,6 +193,7 @@ int token_init(token_state_t **state)
 int token_process(token_state_t *current_state, char* data)
 {
     int len = strlen(data);
+    printf("precessing %s (%d)", data, len);
     int new_len = current_state->build_buffer_len + len; 
 
     int ensure = ensure_buffer_size(&current_state->build_buffer, 
@@ -133,10 +203,14 @@ int token_process(token_state_t *current_state, char* data)
         return ERR_MALLOC_FAILED;
     }
 
-    strcpy(current_state->build_buffer + current_state->build_buffer_len, data);
+    strcpy(current_state->build_buffer + current_state->build_buffer_len - 1, data);
     current_state->build_buffer_len = new_len;
 
-    return process_buffer(current_state);
+    int ret = process_buffer(current_state);
+    
+    current_state->build_buffer[0] = '\0';
+    current_state->build_buffer_len = 1;
+    return ret;
 }
 
 int token_destroy(token_state_t **state)
