@@ -45,6 +45,8 @@ to be such that a grammar is not strictly speaking required. For completeness, a
 grammar would be a good idea (to appease the God of Formality), and Flex seems
 like a perfect way to implement that. 
 
+Also, edit this text. The text is a mess.
+
 What is RPN?
 -----------
 
