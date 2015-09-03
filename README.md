@@ -206,9 +206,11 @@ Note that the operations within the unit encasing all three (the first unit, the
 null unit and the second unit) must pop two values for the encasing unit to
 follow the rules. This can be expressed as:
 
-`(): a -> a`
-`(b) () (c): a -> b c`
-`( (b) () (c) )`: a -> d`
+```
+(): a -> a
+(b) () (c): a -> b c
+( (b) () (c) )`: a -> d
+```
 
 
 A program form its own impicit unit, meaning that a program
@@ -255,13 +257,17 @@ be, in general the index in the queue that holds the token that was pushed. So
 each time a token is pushed onto the stack, the index in the queue is stored
 with it. This brings us to another rule of the stack operators:
 
-```
-(: a -> a [b] : where a and b are queue locations, and b is the queue
-location for the initial paren token for the unit. The value of b is implied, it
-is not pushed.
+``` 
+(: a -> a [b] 
 
-): [b] -> b : where b is the queue location for the initial paren token
-for the unit.
+    where a and b are queue locations, and b is the queue location for the
+    initial paren token for the unit. The value of b is implied, it is not 
+    pushed.
+
+): [b] -> b
+
+    where b is the queue location for the initial paren token for the
+    unit.  
 ```
 
 This is to say, that the queue location for the finalizing paren token of the
@@ -408,4 +414,7 @@ important questions in life.
 
 Moreso I want to finish a prototype of an interactive interpreter (I've started
 it under the `interpretter` directory). That's the first step in terms of
-concrete results.
+concrete results. 
+
+Look over the "complilation is evaluation, evaluation is compilation". I know
+what that means, but it's hard to put it to words.
