@@ -1,11 +1,11 @@
 CC=gcc
 CFLAGS=-c -Wall
-OUTPUT=-o interpreter
+OUTPUT=-o interpreter.out
 
 
-all: interpreter
+all: interpreter.out
 
-interpreter: main.o token.o
+interpreter.out: main.o token.o
 	mkdir -p obj/
 	$(CC) obj/main.o obj/token.o $(OUTPUT)
 
@@ -16,4 +16,4 @@ main.o: src/main.cpp
 	$(CC) $(CFLAGS) src/main.cpp -o obj/main.o
 
 clean: 
-	rm *o interpreter
+	rm *o interpreter.out
