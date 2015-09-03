@@ -3,7 +3,7 @@
 
 #include <regex.h>
 
-typedef enum { INT, OPERATOR, WHITESPACE, UNIT } token_type_t;
+typedef enum { INT, OPERATOR, WHITESPACE} token_type_t;
 
 typedef struct
 {
