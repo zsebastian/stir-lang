@@ -209,14 +209,14 @@ follow the rules. This can be expressed as:
 ```
 (): a -> a
 (b) () (c): a -> b c
-( (b) () (c) )`: a -> d
+( (b) () (c) ): a -> d
 ```
 
 
-A program form its own impicit unit, meaning that a program
-of Stir takes excactly one input and returns excactly one output. Of course, the
-input may be an empty tuple and the output an arbitrarily sized tuple (and vice
-versa ad infinitum) but one input and one output non-the-less.
+A program form its own implicit unit, meaning that a program of Stir takes
+excactly one input and returns excactly one output. Of course, the input may be
+an empty tuple and the output an arbitrarily sized tuple (and vice versa ad
+infinitum) but one input and one output non-the-less.
 
 An (non-complete) example from the previous example of sumation of natural numbers:
 
@@ -234,63 +234,41 @@ correct way to write that code is as follows:
 
 `(5 ((1 +) *) 2 /)`
 
+The unit evaluates to two queue positions (queue pointers), the position of the
+open paren and the position of the closed paren. These two queue pointers form
+what is effectively an anonymous function. When the program queue is evaluated,
+the tokens encased in the unti does not get pushed to the stack, only the unit
+itself (the two queue pointers). The unit gets evaluated as operators that are
+pushed to the stack need to evaluate them. 
 
 #### Identifiers
 
-That code is legal, and it also suffices. We actually don't need variables to do
-anything useful (they are called identifiers, formally, in Stir, but variables are
-also fine). In theory any computing at all (as far as I'm aware, so correct me
-if I'm wrong) can be done with just manipulating a stack like this and never
-storing any value at all in an identifier. Of course, doing so would make it
-unreadable. This is what Stir does : ... No really, ':', is an operator. It's
-called the pull operator and what it does is it pulls in the value (although
-technically it pulls in the queue pointer, which I will go over shortly) into
-an identifier. The identifier is always defined when pulling in a value, and any
-previous identifier is either destroyed before (in the case that the pulls are
-in the same scope [unit]) or a similarily named identifier becomes invisible
-until the newly defined identifier goes out of scope.
+We actually don't need variables to do anything useful. However they make it
+easier for the programmer. In theory any computing at all (as far as I'm aware,
+so correct me if I'm wrong) can be done with just manipulating a stack like this
+and never storing any value at all in an identifier. Of course, doing so would
+make it unreadable, since it's very difficult to express intention. In Stir the
+':'-operator is used for assigment.  It's called the pull operator and what it
+does is it pulls in the value at the top of the queue into an identifier. The
+pull-operator pops the value it stores off of the stack, it can therefore be
+used to just pop the stack, which we will see. The identifier is always defined
+when pulling in a value, and any previous identifier is either destroyed before
+(in the case that the pulls are in the same scope [unit]) or a similarily named
+identifier becomes invisible until the newly defined identifier goes out of
+scope.
 
-Technically an identifer holds not the value that it pulls in, but the pointer
-to the queue location of the token that it pulls in, as well as the pointer to
-its own queue location. Queue locations are what you would probably expect it to
-be, in general the index in the queue that holds the token that was pushed. So
-each time a token is pushed onto the stack, the index in the queue is stored
-with it. This brings us to another rule of the stack operators:
-
-``` 
-(: a -> a [b] 
-
-    where a and b are queue locations, and b is the queue location for the
-    initial paren token for the unit. The value of b is implied, it is not 
-    pushed.
-
-): [b] -> b
-
-    where b is the queue location for the initial paren token for the
-    unit.  
-```
-
-This is to say, that the queue location for the finalizing paren token of the
-unit is the queue location of the initial paren token. We use this fact for
-defining functions. The unit 'remembers' the queue location of the inital paren
-token. Remember that units take one input and produce one result? These two
-rules combined means that the queue location for the input is the queue location
-for the initial paren token, which just so happens to be one after the queue
-location of the input. It is 'as if' the unit never existed in the first place.
-'As if' is an intentional phrasing and means that all the interpretter or compiler
-has to do is act 'as if' it did, i.e. produce the same result that it would if
-it acctually did. 
+Remember that the value of a unit are the two queue locations encasing the unit.
+This is how anonymous functions are named in Stir. 
 
 ```
 (a b +) :foo
 ```
 
-here `foo` stores the queue location of the open paren as well as the location for
-itself. In essence, the "value" of `foo` is the unit. Note that `a` and `b`
-appear to be identifiers themselves. We will expand on that. Note also that
-there is a whitespace between the close paren and the colon. This whitespace
-actually does nothing, the input is expected to be something else than
-whitespace here, and so the whitespace is ignored.
+here `foo` stores the unit before it, which consists of the queue location of
+the open paren and the queue locations of the closed paren. In essence, the
+"value" of `foo` is the unit. Note that `a` and `b` appear to be identifiers
+themselves. We will expand on that. Note also that there is a whitespace between
+the close paren and the colon. This is a requirment for readability. 
 
 Note that identifiers can also hold single values, rather than units. We define these
 simply like this:
@@ -299,17 +277,21 @@ simply like this:
 42 :a
 ```
 
-While technically `a` holds the two pointers encasing the token 42, this is an
-'as if' case, and an interpreter may store the value 42 in `a` (however it
-"stores" that value), because we know that `a` can not possibly hold any other
-value, whatever happens to the stacky.
+The value of a is then simply 42. Should we assign another identifier to a
+instead, the value of that identifier is stored instead:
 
+```
+42 :foo foo :bar
+```
+
+Both foo and bar now have the value 42. 
+ 
 Stir is a strongly typed language with inferred types. This means that the
-identifier must have a type. The type of the identifier is the type that would
-be on top of the stack after evaluation, according to this rule:
-
-`Ti: i -> Ta`, where Ti is the type of the identifer, i is the evaluation of the
-identifer and Ta is the type of the value left on the stack.
+identifier must have a type. In the case of value assigment this is simple, the
+type is simply the type of the value. For units it's a little trickier, since
+units have an input and an output. So units have two values, the in-value and
+the out-value. Identifiers that store units have same kind of type: the in-value
+of the unit it stores and the out-value of the unit it stores.
 
 Writing the name of the identifer is an evaluation of that identifier. We write
 to the stack the tokens, in order, that are between the two addresses the
@@ -385,36 +367,112 @@ fibonachi function.
 
 #### Conditionals
 
+The if statement is an operator that pops the top value off of the stack and and
+temporarily stores it. It then pops and evaluates the next top of the stack. The
+type of that value must be simply boolean. If the value is true, the value that
+was popped earlier is evaluated. If false, the stored value is simply
+disregarded. Remember that the value of a unit are the two queue pointers that
+encase the units. If the first value was a unit, the unit gets evaluated. This
+is nothing unique, and is the case for all operators operating on units. Here's
+an example:
 
-
-## TODO
-
-Obviously what I have done to specify are condionals and loops. My first thought
-was to implement them as short circuited `and` with two units separeted with a
-null unit. Something like:
 
 ```
-(1 2 >) ()
+(1 2 >)
     (a b +)
 if
 ```
 
-It doesn't quite work, since the second conditional must be evaluated before the
-'if' if we want to read the source linearly (I take that to mean that no
-look-ahead is required). `if` here could be exchanged for `and` and it would
-give the same result, is the idea here. Which is nice. I believe that once I
-figure out a way to get conditionals to work loops will fall into place also.
-While I could say that all loops are recursion (and allow for tail recursion)
-and that's that, I don't want to do that because it's stupid. In all fairness
-since we use a stack based language there should never be a need for recursion
-(as traditionally is meant with recursion, ie a function calling itself) anyway.
-While we're at it I need to decide what order non-commutative operators apply
-the stack. Do we write `1 2 -` or `2 1 -` to perform `1 - 2`? These are the
-important questions in life.
+Here we also arrive at our first non-communitive operator, greater-than. What
+this means is simply that the order or operations matter, in our case the value
+of `1 > 2` is vastly different than `2 > 1`. Typically in RPN operators evaluate
+their values in the order they are written, so `1 2 >` means `1 > 2`. Which is
+helpful because otherwise it would be (needlessly) confusing. This also means
+that `a b +` will be evaluated. If that happens, then the value of that
+evaluation is pushed onto the stack. This creates a problem, because it means
+the stack has a different length after an `if` depending on what the condition
+for the `if` evaluates to. Therefore, an `if` will push an empty unit onto the
+stack, should it resolve to false.
+
+In addition, `if` pushes the value of the condition onto the stack. Stir uses
+this to implement `else`. `else` simply is actually a selectively ternary
+operator and in many ways the opposite of `if`: it pops and stores the top of
+the stack. Then pops and evaluates the next top of the stack. If it is false it
+evaluates the stored value, otherwise it just disregards it. If it evaluates the
+stored value, it will also pop the third item on the stack before that. Why will
+be clear in a minute.
+
+So and `if..else`-statement in Stir looks like this:
+
+```
+(a b >) 
+    (a b -)
+if
+    (b a -) 
+else
+```
+
+Think about how the stack will look after this statement. The two units that
+actually does some work will push their out value onto the stack. After the if
+the stack will looks like this: `{a-b} true`, assuming a is greater than b. Then
+we will push the next value in the queue onto the stack, which is the unit
+between the if and the else. Then the stack will look like this: `{a-b} true {(b
+a -)}`. The else wil pop the first value, see that the next value is true and
+then just push true (without evaluating the first value it pops). The stack will
+then look like this: `{a-b} true`. Let's now think about the other alternative,
+that a is not greater than b. 
+
+After the if, the stack instead will look like this: `() false`. Note that
+because the unit was not evaluated, nothing was pushed onto the stack The next
+unit will then be pushed onto the stack: `() false {(b a -)}`. Because the
+second value is false the `else` will evaluated the first unit. If `else` did
+not now also pop the third of the stack, before the evaluation of the first
+unit, that would mean the stack would look like this after: `() {b-a} false`.
+This creates a problem: we now have 3 items on the stack, and we are not sure
+which one holds that value that the `if..else`-condition evaluated. This is a
+problem because the stack will be longer the more interoperating conditions we
+have, and we have no way to use the value that those conditions generated (which
+would be very practical). So, `else` is defined the way it is so that we will
+always end up with two values on the stack, where the first is the condition and
+the second is the value generated. Now think about this: we have two values on
+the stack, but nothing meaningful to do with them to make them into one value.
+That is a problem indeed, because practically we really do want to make them
+into one value, the if..else-statement is very likely part of a unit, and we are
+very much intrested in making the unit only output one value. We could use the
+pull-operator for this, and simply not supply an identifer name. Doing this
+means we pull the value off of the stack into the void, basically a pop
+operator:
+
+```
+(a b >)
+    (a b -)
+if
+    (b a -)
+else :
+:diff
+```
+
+Here the identifier diff will have the value of the difference between a and b
+expressed as an absolute value. After this the stack is excaclty empty.
+
+Not also that we can do cascading `if..else` in Stir, but it is a litte tricky:
+
+
+## TODO
+
+Conditionals are hairy. What we want to do is have a complete conditional
+statement that takes in one thing, and ouputs whatever it ended up evaluating.
+This is, however, not excactly practical, since any conditionals nested in them
+will add to the stack. What we really want is and end statement, that cleans it
+all up, in the end. I will study what other stack based languages have done.
+
+I need to decide what order non-commutative operators apply the stack. Do we
+write `1 2 -` or `2 1 -` to perform `1 - 2`? These are the important questions
+in life.
 
 Moreso I want to finish a prototype of an interactive interpreter (I've started
 it under the `interpretter` directory). That's the first step in terms of
 concrete results. 
 
 Look over the "complilation is evaluation, evaluation is compilation". I know
-what that means, but it's hard to put it to words.
+what that means, but it's hard to put into words what it means.
