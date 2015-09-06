@@ -200,7 +200,7 @@ Meaning that any operations performed in a unit may only pop one stack element
 and MUST push one stack element back onto the stack. It may, in theory, do
 nothing at all, in which case it is the `null unit` (literally `()`) which acts
 as a `stack guard`. A null unit is how we are able to extend the stack. We are
-still not able to pop above it, but the next unit does not the, as input, the
+still not able to pop above it, but the next unit does not, as input, take the
 stack before the null unit, and as such can extend the stack with one element.
 Note that the operations within the unit encasing all three (the first unit, the
 null unit and the second unit) must pop two values for the encasing unit to
@@ -239,7 +239,7 @@ open paren and the position of the closed paren. These two queue pointers form
 what is effectively an anonymous function. When the program queue is evaluated,
 the tokens encased in the unti does not get pushed to the stack, only the unit
 itself (the two queue pointers). The unit gets evaluated as operators that are
-pushed to the stack need to evaluate them. 
+pushed to the stack need to evaluate them. Stir is therefor lazily evaluated.
 
 #### Identifiers
 
@@ -367,96 +367,64 @@ fibonachi function.
 
 #### Conditionals
 
-The if statement is an operator that pops the top value off of the stack and and
-temporarily stores it. It then pops and evaluates the next top of the stack. The
-type of that value must be simply boolean. If the value is true, the value that
-was popped earlier is evaluated. If false, the stored value is simply
-disregarded. Remember that the value of a unit are the two queue pointers that
-encase the units. If the first value was a unit, the unit gets evaluated. This
-is nothing unique, and is the case for all operators operating on units. Here's
-an example:
-
-
-```
-(1 2 >)
-    (a b +)
-if
-```
-
-Here we also arrive at our first non-communitive operator, greater-than. What
-this means is simply that the order or operations matter, in our case the value
-of `1 > 2` is vastly different than `2 > 1`. Typically in RPN operators evaluate
-their values in the order they are written, so `1 2 >` means `1 > 2`. Which is
-helpful because otherwise it would be (needlessly) confusing. This also means
-that `a b +` will be evaluated. If that happens, then the value of that
-evaluation is pushed onto the stack. This creates a problem, because it means
-the stack has a different length after an `if` depending on what the condition
-for the `if` evaluates to. Therefore, an `if` will push an empty unit onto the
-stack, should it resolve to false.
-
-In addition, `if` pushes the value of the condition onto the stack. Stir uses
-this to implement `else`. `else` simply is actually a selectively ternary
-operator and in many ways the opposite of `if`: it pops and stores the top of
-the stack. Then pops and evaluates the next top of the stack. If it is false it
-evaluates the stored value, otherwise it just disregards it. If it evaluates the
-stored value, it will also pop the third item on the stack before that. Why will
-be clear in a minute.
-
-So and `if..else`-statement in Stir looks like this:
-
-```
-(a b >) 
-    (a b -)
-if
-    (b a -) 
-else
-```
-
-Think about how the stack will look after this statement. The two units that
-actually does some work will push their out value onto the stack. After the if
-the stack will looks like this: `{a-b} true`, assuming a is greater than b. Then
-we will push the next value in the queue onto the stack, which is the unit
-between the if and the else. Then the stack will look like this: `{a-b} true {(b
-a -)}`. The else wil pop the first value, see that the next value is true and
-then just push true (without evaluating the first value it pops). The stack will
-then look like this: `{a-b} true`. Let's now think about the other alternative,
-that a is not greater than b. 
-
-After the if, the stack instead will look like this: `() false`. Note that
-because the unit was not evaluated, nothing was pushed onto the stack The next
-unit will then be pushed onto the stack: `() false {(b a -)}`. Because the
-second value is false the `else` will evaluated the first unit. If `else` did
-not now also pop the third of the stack, before the evaluation of the first
-unit, that would mean the stack would look like this after: `() {b-a} false`.
-This creates a problem: we now have 3 items on the stack, and we are not sure
-which one holds that value that the `if..else`-condition evaluated. This is a
-problem because the stack will be longer the more interoperating conditions we
-have, and we have no way to use the value that those conditions generated (which
-would be very practical). So, `else` is defined the way it is so that we will
-always end up with two values on the stack, where the first is the condition and
-the second is the value generated. Now think about this: we have two values on
-the stack, but nothing meaningful to do with them to make them into one value.
-That is a problem indeed, because practically we really do want to make them
-into one value, the if..else-statement is very likely part of a unit, and we are
-very much intrested in making the unit only output one value. We could use the
-pull-operator for this, and simply not supply an identifer name. Doing this
-means we pull the value off of the stack into the void, basically a pop
-operator:
+Conditionals are difficult. I want a conditional to basically be a unit that
+takes in a value (any value, not a boolean at this point) and returns a value,
+and value. Essentially the returned value is dependent on some condition (which
+is the boolean. A conditional should essentially be a transformation of data
+from one form to another based on the condition that that data is in. This is a
+little different than if-statements in other languages, at least of how those
+languages think about if. However, this is still what an if-statement is at its
+core. What I think needs to happen is that the language requires an `if..else`,
+even if the `else` is not logically required for the problem. It will mean that
+the stack remains balanced, whether the condition was true or false. Consider
+something like:
 
 ```
 (a b >)
     (a b -)
-if
     (b a -)
-else :
-:diff
+elif
 ```
 
-Here the identifier diff will have the value of the difference between a and b
-expressed as an absolute value. After this the stack is excaclty empty.
+This would leave the distance between a and b, in absolute value, left on the
+stack. The values a and be should be on top of the stack at this point, why
+else would we be interested in them? If that is the case, and we are interested
+in the distance between them, why should that distance be left on the stack? I
+suspect that every time we use a conditional we can do it in the same type of
+way. If we only had an if here, we would be left with that value only if the
+condition resolved to true and we would have no way of knowing whether there was
+that extra value on the stack or not. Under this view of condititons, that is
+the only thing that makes sense. Assuming we do not want a conditional to push
+the expression value on the stack, how are we using that value then? 
 
-Not also that we can do cascading `if..else` in Stir, but it is a litte tricky:
+# For
 
+There are no for-loops in Stir. Instead, we use a mechanism of
+producer/consumer. An expression can act as a producer, which produces a range
+of items that are pushed onto the stack. A consumer is the expression at the
+other end, wherein we use those values. A consumer can also produce for another
+consumer. To truly do for-loops this way we need a way to express a range. For
+this we use the `..` operator.
+
+```
+0 :count #(1 4 ..) :(count + :count) 
+```
+
+The value of `count` is now the sum of all natural numbers between 1 and 4. A
+producer is a unit decleared with a "#" in front of the open paren (no
+whitespace), read as "producer". A consumer is written with a ":" in front of
+the open paren (again no whitespace), read as "pull into".
+
+consumer can also be a producer, for example we might want to add all squared
+of the natural numbers between 1 and 4. Then we would write this:
+
+```
+0 :sqrd #(1 4 ..) :#(# *) :(count + :count)
+```
+
+'#' is a literal meaning the value that was produced, which is also on the top
+of the stack. A consumer that is also a producer is written as ":#", which can
+be read as 'pull into producer'.
 
 ## TODO
 
@@ -466,9 +434,14 @@ This is, however, not excactly practical, since any conditionals nested in them
 will add to the stack. What we really want is and end statement, that cleans it
 all up, in the end. I will study what other stack based languages have done.
 
-I need to decide what order non-commutative operators apply the stack. Do we
-write `1 2 -` or `2 1 -` to perform `1 - 2`? These are the important questions
-in life.
+We need a way to duplicate the value on top of the stack. We shouldn't rely on
+identifiers to do this. In fact, we might want to discourage identifiers at all.
+
+Consumers and producers need work. # cannot be an alias for the produced value
+because there is conflict in that if we have a producer in a consumer. If # is
+the last value in that unit, is the # the value or is it indicating that the
+next unit is a producer? As in `#(1 2 ..) :(1 #(2))`. How do we know without
+lookahead?
 
 Moreso I want to finish a prototype of an interactive interpreter (I've started
 it under the `interpretter` directory). That's the first step in terms of
