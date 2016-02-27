@@ -4,9 +4,9 @@ OUTPUT=-o interpreter.out
 
 
 all: interpreter.out
+	mkdir -p obj/
 
 interpreter.out: main.o token.o
-	mkdir -p obj/
 	$(CC) obj/main.o obj/token.o $(OUTPUT)
 
 token.o: src/token.cpp

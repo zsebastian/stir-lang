@@ -8,8 +8,8 @@ typedef enum { INT, OPERATOR, WHITESPACE} token_type_t;
 typedef struct
 {
     token_type_t token_type;
-    char* begin;
-    char* end;
+    int build_buffer_begin;
+    int build_buffer_end;
 } token_t;
 
 typedef struct
@@ -17,14 +17,17 @@ typedef struct
     token_t *buffer;
     int buffer_reserve;
     int buffer_len;
-} token_queue_t;
+} token_array_t;
 
 typedef struct 
 {
-    token_queue_t token_queue;
+    token_array_t token_queue;
     char* build_buffer;
     int build_buffer_reserve;
     int build_buffer_len;
+
+    token_array_t eval_stack;
+    int current_token_queue_position; //which position are we evaluating
 
     regex_t int_regex; 
     regex_t operator_regex; 
