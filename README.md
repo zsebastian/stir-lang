@@ -6,8 +6,9 @@ Stir Language
 What is Stir?
 -------------
 
-Stir is a stack based language currently under design. This project aims to
-prototype an interactive interpretter for the language to see if it's feasible.
+Stir is a stack based language currently under design. It is functional and
+without side effects. This project aims to prototype an interactive interpretter
+for the language to see if it's feasible.
 
 Rationale
 ---------
@@ -18,7 +19,7 @@ always had an inkling frustration whenever I was forced to use a normal
 calculator, and have been meaning to write my own RPN-calculator for a while.
 At this point I am competent enough to create a language based on RPN. As such
 this will be project that will be useful to me and I anticipate will be fun for
-me to develop.
+me to develop. 
 
 The interpreter
 --------------
@@ -81,8 +82,8 @@ illustrated in text thusly:
 
 While we at this point hardly recognize the power, or usefullness, of this we
 may realize this is only because the example above was trivial. So let's
-consider something more useful, for example the formula for all natural numbers,
-which in text form can be written like this:
+consider something more useful, for example the formula adding all natural
+numbers up to `n`, which in text form can be written like this:
 
 `(n * (n + 1)) / 2`
 
@@ -96,7 +97,7 @@ this:
 `n 1 + n * 2 /`
 
 To see how this works, let's observe the stack. Because we want to see the
-results, let's substitute `n` for (so `5 1 + 5 * 2 /`)
+results, let's substitute `n` for `5` (so `5 1 + 5 * 2 /`)
 
 ```
 5: 5
@@ -134,7 +135,8 @@ efficiently without many optimizations. But, that remains to be seen when I get
 there. I want it to be native though.
 3. Compilation is evaluation, evaluation is compilation (though not literally).
    From the design that I have currently there is very little difference between
-compilation and evaluation, in theory. As I can see it.
+compilation and evaluation, in theory. As I can see it. I will expand on this,
+but I feel that it is crucial (though hard for me to explain).
 4. The language is strongly typed with inferred types and generics is an
    automatic feature of the lanuage. However, the language will support explicit
 types. 
@@ -153,7 +155,7 @@ stack when the program is evaluated. Tokens are mostly pushed with whitespace,
 although some tokens can push themselves, as well as cause others to be pushed
 (parentheses for example). The basic tokens are literals and mathematical
 operators (including boolean operators and bit manipulator operators). Literals
-are integer numbers, decimal numbers, boolean values, strings and characters
+are integer numbers, floating point numbers, boolean values, strings and characters
 (the usual literals). Note that there is no "Number" type, like most scripting
 lanugage (Number is an awful type to have in a language). Operators are also the
 typical, and are written as they are typically (or at least intuitively).
@@ -165,13 +167,13 @@ So for example the string:
 ...is so far a valid string, according to the description above. Additionally it
 will push 7 tokens on the program queue. Because compilation and evaluation is the same
 thing, operators do not "pop" the stack (more on that later). Of course there
-are more rules than this. So what let's introduce them.
+are more rules than this. So let's introduce them.
 
 Each operation (with an operation being defined as applying a token from the
 queue to the stack) is defined by how it manipulates the stack. There are two
 ways of manipulating the stack that is relevant here. First, an operation can
 push one or more values onto the stack. Second, an operation can pop one or more
-calues onto the stack. Operation can also do both of those things. The notation
+values onto the stack. Operations can also do both of those things. The notation
 for writing what an operation does to the stack looks like this:
 
 `T: a -> b`
@@ -193,32 +195,37 @@ language.
 #### Units
 
 A `unit` is a list of tokens that form a logical unit. Units are encased in
-parentheses: `( )`. Units form an identifier scope and they enforce this rule: 
+parentheses: `( )`. Units are meant to enhance predicability and provability of
+a program. They make sure the stack behaves in specific ways. More specifically,
+if we "call into" a unit (and units can be viewed as anonymous functions, in
+fact can be used as such), we know what that unit will do to the stack we
+present to it. Namely it will always and only pop the top value and leave
+exactly one value back on top. Units form an identifier scope and they enforce this
+rule: 
 
 `(b): a -> b`
 
-Meaning that any operations performed in a unit may only pop one stack element
-(in addition it may also never pop above that element, under any circumstances)
-and MUST push one stack element back onto the stack. It may, in theory, do
-nothing at all, in which case it is the `null unit` (literally `()`) which acts
-as a `stack guard`. A null unit is how we are able to extend the stack. We are
-still not able to pop above it, but the next unit does not the, as input, the
-stack before the null unit, and as such can extend the stack with one element.
-Note that the operations within the unit encasing all three (the first unit, the
-null unit and the second unit) must pop two values for the encasing unit to
-follow the rules. This can be expressed as:
+Meaning that any operations performed in a unit may only pop one stack element.
+In fact it must do so. In addition it may also never pop above that element,
+under any circumstances and MUST push one stack element back onto the stack. It
+may, in theory, do nothing at all, in which case it is the `null unit`
+(literally `()`) which acts as a `stack guard`. Null units are nothing special,
+they are just a natural conclusion of unit rules. In essence, they can be viewed
+as units that pop the top value, and leave the top value back. In other words,
+it is an identity funtion. This can be expressed as:
 
 ```
 (): a -> a
 (b) () (c): a -> b c
-( (b) () (c) )`: a -> d
+( (b) () (c) )`: a -> d # d is the result of b and c, or b o c
 ```
 
 
-A program form its own impicit unit, meaning that a program
-of Stir takes excactly one input and returns excactly one output. Of course, the
-input may be an empty tuple and the output an arbitrarily sized tuple (and vice
-versa ad infinitum) but one input and one output non-the-less.
+A program form its own impicit unit, meaning that a program of Stir takes
+excactly one input and returns excactly one output. Of course, the input may be
+an empty tuple and the output an arbitrarily sized tuple (and vice versa ad
+infinitum) but one input and one output non-the-less. (We will deal with tuples
+and other collections later).
 
 An (non-complete) example from the previous example of sumation of natural numbers:
 
@@ -226,31 +233,32 @@ An (non-complete) example from the previous example of sumation of natural numbe
 
 Here we use an abundance of parentheses to show that unit can be recursive, i.e.
 a unit can have one or many 'child' units. It also shows that we can use units
-to make our intentionc clearer to the (human) reader. Of course, this many
+to make our intentions clearer to the (human) reader. Of course, this many
 parentheses hardly helps. This is also not strictly speaking legal Stir, since
 the outer-most unit is a unit that takes no input (or at least does nothing with
 the input) but returns an output. We can't have that, that would unbalance the
 stack! Before we know it we have stacks running around our backyard. The point
 of a program is that it takes input, if we have no input we have no program. The
-correct way to write that code is as follows:
+correct (or, more correct, if we consider `5` to be the input) way to write that
+code is as follows:
 
-`(5 ((1 +) *) 2 /)`
+`5 (((1 +) *) 2 /)`
 
 
 #### Identifiers
 
-That code is legal, and it also suffices. We actually don't need variables to do
-anything useful (they are called identifiers, formally, in Stir, but variables are
-also fine). In theory any computing at all (as far as I'm aware, so correct me
-if I'm wrong) can be done with just manipulating a stack like this and never
-storing any value at all in an identifier. Of course, doing so would make it
-unreadable. This is what Stir does : ... No really, ':', is an operator. It's
-called the pull operator and what it does is it pulls in the value (although
-technically it pulls in the queue pointer, which I will go over shortly) into
-an identifier. The identifier is always defined when pulling in a value, and any
-previous identifier is either destroyed before (in the case that the pulls are
-in the same scope [unit]) or a similarily named identifier becomes invisible
-until the newly defined identifier goes out of scope.
+That code is (sort of) legal, and it also suffices. We actually don't need
+variables to do anything useful (they are called identifiers, formally, in Stir,
+but variables are also fine). In theory any computing at all (as far as I'm
+aware, so correct me if I'm wrong) can be done with just manipulating a stack
+like this and never storing any value at all in an identifier. Of course, doing
+so would make it unreadable. This is what Stir does : ... No really, ':', is an
+operator. It's called the pull operator and what it does is it pulls in the
+value (although technically it pulls in the queue pointer, which I will go over
+shortly) into an identifier. The identifier is always defined when pulling in a
+value, and any previous identifier is either destroyed before (in the case that
+the pulls are in the same scope [unit]) or a similarily named identifier becomes
+invisible until the newly defined identifier goes out of scope.
 
 Technically an identifer holds not the value that it pulls in, but the pointer
 to the queue location of the token that it pulls in, as well as the pointer to
@@ -284,10 +292,10 @@ has to do is act 'as if' it did, i.e. produce the same result that it would if
 it acctually did. 
 
 ```
-(a b +) :foo
+(a b +) :foo # This is not legal stir.
 ```
 
-here `foo` stores the queue location of the open paren as well as the location for
+Here `foo` stores the queue location of the open paren as well as the location for
 itself. In essence, the "value" of `foo` is the unit. Note that `a` and `b`
 appear to be identifiers themselves. We will expand on that. Note also that
 there is a whitespace between the close paren and the colon. This whitespace
@@ -304,7 +312,7 @@ simply like this:
 While technically `a` holds the two pointers encasing the token 42, this is an
 'as if' case, and an interpreter may store the value 42 in `a` (however it
 "stores" that value), because we know that `a` can not possibly hold any other
-value, whatever happens to the stacky.
+value, whatever happens to the stack.
 
 Stir is a strongly typed language with inferred types. This means that the
 identifier must have a type. The type of the identifier is the type that would
@@ -319,7 +327,7 @@ identifier stores. In order to call foo on two numbers, effectively adding them,
 we could then do something like this:
 
 ```
-(:a :b a b +) :foo
+(:a :b a b +) :foo # still not legale stir
 40 2 foo
 ```
 
@@ -332,13 +340,15 @@ But how do we do that?
 #### Tuples
 
 In order to handle more than one value at a time, passing them in and out of a
-unit, we have tuples. Tuples use squared brackets rather than parentheses and
-the tokens, or values, are whitespace separated. They look like this:
+unit, we have tuples. (Note that, then, built in operators are the only
+operations that may pop more than one value from the stack with one operation).
+Tuples use squared brackets rather than parentheses and the tokens, or values,
+are whitespace separated. They look like this:
 
 `[1 2 3]`
 
 The above is a tuple of 3 integers. They are considered one stack element and
-as such can the output and/or input of a unit. Unpacking tuples into idenfiers
+as such can be the output and/or input of a unit. Unpacking tuples into idenfiers
 is done by writing a colon in front of the tuple, this is understood as "pull
 into tuple of...", so for example:
 
@@ -347,15 +357,14 @@ into tuple of...", so for example:
 Assigns the value 42 to foo and 9001 to bar. The identifiers are assigned in
 order and are assigned the address for the value they are assigned to up until
 the next value. The evaluation of the identifier then becomes the value they are
-assigned to. We must have at least one whitespace between the first
-tuple and the colon, but the second tuple must be followed immediately by the
-colon, as `:[` is considered one token. This is true for `:identifier` also.
-This is the only way to use the values of tuples separetely, since the tuple is
-considered a single value. Note that we can do something with the values of this
-tuple and then "return" the original tuple again. Tuples are strongly typed, and 
-and may only be unpacked using the same number of identifers, who will get the
-same type as the value they are assigned (or rather, what type the value
-evaluates to).
+assigned to. We must have at least one whitespace between the first tuple and
+the colon, but the second tuple must be followed immediately by the colon, as
+`:[` is considered one token. This is true for `:identifier` also.  This is the
+only way to use the values of tuples separetely, since the tuple is considered a
+single value. Note that we can do something with the values of this tuple and
+then "return" the original tuple again. Tuples are strongly typed, and may only
+be unpacked using the same number of identifers, who will get the same type as
+the value they are assigned (or rather, what type the value they evaluate to).
 
 A tuple may contain units, or identifers. Like so:
 
@@ -385,38 +394,109 @@ language. Calling `foo` is then done like thus:
 Let's implement a more intresting function. Let's, for (a dull) example, implement the
 fibonachi function.
 
-#### Conditionals
+## Flow control
+
+#### Enumeration and Coroutines
+
+A core feature of the language is based on a producer/consumer concept, and it
+is how deal with collections of data. A producer supplies a consumer with
+serial data, and can apply a transformation. Let's look at an example
+
+`>(1 +)>`
+
+`>(` denotes a consumer, while `)>` denotes a producer. The unit encased apply a
+transformation and yields the value of the transformation to the consumer. As is
+typical the consumer only can handle one value from the stack, but that value is
+typically (although it doesn't have to be) a collection of some sort. Consumer
+and producers together form a coroutine, and they have certain characteristics
+that we will go into. We already know about tuples, so let's look at a coroutine
+involving a tuple.
+
+```
+((:[a] a a *) :exp
+  [1 2 3 4 5 6] >(
+    exp
+  )> :[a b c d e f])
+```
+
+Here we take in a tuple with values 1 through 6, apply and a function
+exponentiating the value by 2 and store them as values a through f (we can do
+better than that, but so far this is what we can do). This is equivilent to the
+C# code:
+
+```
+int exp(int a)
+{
+    return a * a;
+}
+
+IEnumerable<int> expEnumerable(IEnumerable<int> arr)
+{
+    foreach(var a in arr)
+    {
+        yield return exp(a);
+    }
+}
+```
+
+If you are familiar with C#'s enumerables, this is where I take the idea
+(although it is an old mathematical idea and is used in functional languages.
+They are monads, as far I as understand them). I find them very useful and will
+be useful for a language as stir, as I foresee the use cases for stir might be.
+It is useful for transforming data.
 
 
+#### If
+
+Conditionals in the language must satisfy certain properties. Most importantly a
+conditional must always leave the stack in the same condition no matter what the
+result of the condition is. What that means is that after we have evaluated a
+condition we must find the stack the same length and with the same types no
+matter what the condition evaluated to. This has certain implications, for
+example there can be no naked ifs, and both ifs and elses must push the same
+types of values onto the stack, if any. Here we also encounter another problem,
+with conditionals in coroutines, me might want to only yield a value if a
+certain condition evaluates to true (or false).
+
+Let's look at conditionals as if they were a function. In other programming
+languages, if we call a function we expect a return (assuming no void
+functions). A function may give us a value if a certain condition is met,
+otherwise it may give us some other value (null perhaps). In stir there are no
+null values. Null values are the bane of all existance and should be avoided at
+all costs, and so in stir there are no null values. So we can't do that. But the
+only use of a conditional is just this: produce one value if a condition is met,
+otherwise another value. Because we have no side effects in stir, this is the
+only reason to ever use conditionals. Stir is always concerned with data
+transformation, and nothing more. It always ever takes an input and produces an
+output, there is no other type of program in stir. So it makes sense, I think,
+to restrict conditionals this way. While there are ways to effectively do other
+things with conditionals, which we will see once other data structures are
+presented, for now this is the only thing we ever want to do. So let's start
+with a working example.
+
+```
+  (:[a] (a 0 <) (-a) (a) ifelse) :abs # (-a) and (a) needn't be encased in units
+```
+
+This defines an absolute value function. `ifelse` is an operator that takes in 3
+values: a boolean value, and two other values. If the first value is true, it
+will push the second value onto the stack, otherwise itt will push the third
+value onto the stack. We can do `if... else if... else` like this:
+
+```
+  (:[a] 
+    ((a 0 <)
+      (-1)
+      ((a 0 >)
+        (1)
+        (0)
+      elseif)
+    elseif)) :unit
+```
 
 ## TODO
 
-Obviously what I have done to specify are condionals and loops. My first thought
-was to implement them as short circuited `and` with two units separeted with a
-null unit. Something like:
+Interpretter.
 
-```
-(1 2 >) ()
-    (a b +)
-if
-```
-
-It doesn't quite work, since the second conditional must be evaluated before the
-'if' if we want to read the source linearly (I take that to mean that no
-look-ahead is required). `if` here could be exchanged for `and` and it would
-give the same result, is the idea here. Which is nice. I believe that once I
-figure out a way to get conditionals to work loops will fall into place also.
-While I could say that all loops are recursion (and allow for tail recursion)
-and that's that, I don't want to do that because it's stupid. In all fairness
-since we use a stack based language there should never be a need for recursion
-(as traditionally is meant with recursion, ie a function calling itself) anyway.
-While we're at it I need to decide what order non-commutative operators apply
-the stack. Do we write `1 2 -` or `2 1 -` to perform `1 - 2`? These are the
-important questions in life.
-
-Moreso I want to finish a prototype of an interactive interpreter (I've started
-it under the `interpretter` directory). That's the first step in terms of
-concrete results. 
-
-Look over the "complilation is evaluation, evaluation is compilation". I know
-what that means, but it's hard to put it to words.
+Selective yielding in producer, yield if (some expression), also yield many from
+one value.
