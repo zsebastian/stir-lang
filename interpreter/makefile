@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-c -Wall
+CFLAGS=-c -Wall -Og
 OUTPUT=-o interpreter.out
 
 all: interpreter.out

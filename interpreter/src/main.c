@@ -15,6 +15,7 @@ int main(int argc, char **argv)
     {
         if (line != NULL)
         {
+            printf("%s", line);
             parser_process(parser, line);
         }
         printf("\n>"); 

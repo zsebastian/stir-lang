@@ -10,6 +10,7 @@ typedef struct parser
     
     /* All tokens are stored here */
     char *string; 
+    int balance;
 } parser_t;
 
 int parser_free(parser_t* parser);

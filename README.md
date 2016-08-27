@@ -495,13 +495,70 @@ value onto the stack. We can do `if... else if... else` like this:
 ```
 #### Grammar
 
-The grammar for Stir is as follows:
+The grammar for Stir is simple up until the expression symbol. The
+expression symbol is specified as pseudocode instead.
 
+program -> expression
+unit -> "(" ws expression ws ")"
+operand -> unit | literal | identifier | tuple
+tuple -> "[" ws [ expression { ws "," ws expression } ] ws "]"
+binaryoperator -> "\*" | "+" | "-" | "/"
 
+literal -> integer | float | double
+
+double -> natural "." { digit }
+float -> natural ("f" | "." { digit } "f")
+integer -> natural
+
+natural -> zero | nonzerodigit { digit }
+
+zero = "0"
+nonzerodigit = [1-9]
+digit = [0-9]
+
+identifier = ("\_" | alphabetic) { alphanumeric }
+
+alphanumeric = [0-9a-zA-Z]
+alphabetic = [a-zA-Z]
+
+ws -> { whitespace }
+
+# while fairly simple, this can not be expressed in
+# any grammar notation that I am aware. It should be 
+# possible to implement within a handwritte 
+# recursive decent parser
+expression ->
+    balance = 0
+    while there are tokens
+        if next is operand
+            consume
+            balance++
+        else if next is ternaryoperator
+            consume
+            balance-=2
+        else if next is binaryoperator
+            consume
+            balance--
+        else if next is unaryoperator
+            consume
+        else if next is at least one whitespace
+            consume
+        else
+            break from loop
+    
+    if balance < 1
+        error "too many operators"
+    else if balance > 1
+        error "too few operators" 
 
 ## TODO
 
-Interpretter.
+Parser.
+
+Virtual machine
+    - start with a simply bytecode to get things going 
 
 Selective yielding in producer, yield if (some expression), also yield many from
 one value.
+
+
