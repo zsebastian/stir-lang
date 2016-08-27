@@ -17,6 +17,6 @@ int parser_free(parser_t* parser);
 
 int parser_init(parser_t* parser);
 
-int parser_process(parser_t* parser, char* str);
+int parser_process(parser_t* parser, char* str, token_t** result, int* t_count);
 
 #endif

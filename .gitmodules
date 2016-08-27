@@ -1,3 +1,6 @@
 [submodule "interpreter/modules/klib"]
 	path = interpreter/modules/klib
 	url = git@github.com:attractivechaos/klib.git
+[submodule "interpreter/modules/parg"]
+	path = interpreter/modules/parg
+	url = git@github.com:jibsen/parg.git

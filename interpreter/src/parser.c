@@ -37,7 +37,6 @@ char *str_concat(char *a, char* b)
         n[0] = '\0';
         strcat(n, a);
         strcat(n, b);
-        printf("n: %s", n);
         return n;
     }
     else
@@ -113,10 +112,6 @@ void store_restore(parse_job_t* job)
 void consume(parse_job_t* job, token_type_t token_type)
 {
     int characters = job->look_ahead - job->next_chr;
-    printf("consume: [%d,%d] %d: %.*s\n", 
-            job->next_chr, characters,
-            token_type, 
-            characters, job->parser->string + job->next_chr);
     token_t token;
     token.full_string = &job->parser->string;
     token.type = token_type;
@@ -257,7 +252,6 @@ int sym_unit(parse_job_t* job)
 
 int sym_expression(parse_job_t* job)
 {
-    printf("sym_expression(%p)\n", sym_expression);
     // an expression runs for as many operands and 
     // operators as possible. The only requirement is
     // that we MUST end up with one value one the stack
@@ -268,7 +262,6 @@ int sym_expression(parse_job_t* job)
     // balance somehow.
     int balance = 0;
 
-    printf("start ");
     store_push(job);
     while(true)
     {
@@ -276,23 +269,19 @@ int sym_expression(parse_job_t* job)
         if (one(job, sym_operand))
         {
             balance++;
-            printf("balance++ %d\n", balance);
         }
         else if (one(job, sym_binary_operator))
         {
             balance--;
-            printf("balance-- %d\n", balance);
         }
         else if (read(job) <= 32 && read(job) > 0)
         {
             next(job);
-            printf("balance %d\n", balance);
             skip_whitespace(job);
         }
         else
         {
             store_restore(job);
-            printf("end balance %d\n", balance);
             if (balance != 1)
             {
                 store_restore(job);
@@ -323,20 +312,24 @@ int sym_binary_operator(parse_job_t *job)
     {
         case '*':
             t = TOK_MULTIPLICATION;
+            break;
         case '+':
             t = TOK_ADDITION;
+            break;
         case '-':
             t = TOK_SUBTRACTION;
+            break;
         case '/':
             t = TOK_DIVISION;
+            break;
             
-            next(job);
-            consume(job, t);
-            return true;
-
         default:
             return false;
     }
+    next(job);
+    consume(job, t);
+    return true;
+
 }
 
 
@@ -417,7 +410,6 @@ int term_zero(parse_job_t *job)
 void print_tokens(token_t* tokens, int len)
 {
     token_t* end = tokens + len;
-    printf("%d: ", len);
     while(tokens != end)
     {
         char* str = (char *)malloc(tokens->length);
@@ -441,7 +433,7 @@ void print_tokens(token_t* tokens, int len)
     printf("\n");
 }
 
-int parser_process(parser_t *parser, char *str)
+int parser_process(parser_t* parser, char* str, token_t** result, int* t_count)
 {
     parse_job_t job = {};
     char *up = parser->string;
@@ -468,6 +460,8 @@ int parser_process(parser_t *parser, char *str)
 
     printf("prev %d", prev);
     print_tokens(&kv_A(parser->token_queue, prev), len);
+    *result = &kv_A(parser->token_queue, 0);
+    *t_count = kv_size(parser->token_queue);
 
     return ret;
 }

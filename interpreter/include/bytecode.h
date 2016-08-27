@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-// Store a constant onto the stack 
+// Pushes a constant onto the stack 
 #define ICONST 0
 
 // Push the value in a register onto the stack

@@ -5,15 +5,15 @@
 
 
 int cpu_execute(uint32_t* instructions, int instructions_size,
-        uint32_t* memory, int memory_size,
+        uint8_t* memory, int memory_size,
         int entry_point)
 {
     uint32_t *ip = instructions + entry_point;
     uint32_t *end = instructions + instructions_size;
-    uint32_t *stack = memory + memory_size;
-    uint8_t* mem_bytes = (uint8_t *)memory;
+    uint32_t *stack = (uint32_t *)(memory + memory_size);
     uint32_t registers[4]; 
     printf("\n");
+    printf("%d instructions: %p\n", instructions_size, instructions);
     while(ip != end)
     {
         uint32_t value;
@@ -38,17 +38,17 @@ int cpu_execute(uint32_t* instructions, int instructions_size,
                 registers[r0] = *stack;
                 break;
             case LOAD:
-                registers[r0] = *(uint32_t *)(mem_bytes + addr);
+                registers[r0] = *(uint32_t *)(memory + addr);
                 break;
             case STORE:
-                *(uint32_t *)(mem_bytes + addr) = registers[r0];
+                *(uint32_t *)(memory + addr) = registers[r0];
                 break;
             case IADD:
             {
                 int32_t a = *(int32_t *)&registers[r0];
                 int32_t b = *(int32_t *)&registers[r1];
                 int32_t res = a + b;
-                printf("%d = %d\n", r1, res);
+                printf("%d = %d\n", r2, res);
                 registers[r2] = *(uint32_t *)&(res);
             } break;
             case ISUB:

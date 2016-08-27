@@ -3,55 +3,126 @@
 #include "../include/parser.h"
 #include "../include/bytecode.h"
 #include "../include/cpu.h"
+#include "../modules/parg/parg.h"
+#include "../include/code_generator.h"
 
 char* read_stdin(void);
 
 int main(int argc, char **argv)
 {
-    uint32_t memory[32] = {0};
+    struct parg_state ps;
+    int c;
+    int interactive = 0;
+    char *execute = NULL;
 
-    uint32_t instructions[] = 
+    parg_init(&ps);
+    while((c = parg_getopt(&ps, argc, argv, "hie:")) != -1)
     {
-        bytecode_iconst(32),
-        bytecode_iconst(10),
-        bytecode_pop(0),
-        bytecode_pop(1),
-        bytecode_iadd(0, 1, 2),
-        bytecode_store(2, 0),
-        bytecode_push(2),
-        bytecode_halt(0)
-    };
-    int ret = cpu_execute(instructions, sizeof(instructions) / sizeof(instructions[0]),
-            memory, sizeof(memory) / sizeof(memory[0]), 0);
-
-    printf("[%d]\n", ret);
-
-    int i = 0;
-    for(; i < sizeof(memory) / sizeof(memory[0]); i++)
-    {
-        if ((i % 8) == 0)
+        switch(c)
         {
-            printf("\n");
+            case 1:
+                printf("nonoption '%s'\n", ps.optarg);
+                break;
+            case 'i':
+                interactive++;
+                break;
+            case 'e':
+                execute = (char *)ps.optarg;
+                break;
+            case 'h':
+                printf("usage: stir [-i input]\n"); 
+                return EXIT_SUCCESS;
+            default:
+                printf("unknown option: %c", (char)c);
         }
-        printf("%02x ", (memory[i] & 0xFF000000) >> 24);
-        printf("%02x ", (memory[i] & 0x00FF0000) >> 16);
-        printf("%02x ", (memory[i] & 0x0000FF00) >> 8);
-        printf("%02x ", memory[i] & 0x000000FF);
     }
-    return 0;
+
+    {
+        uint8_t memory[32];
+
+        uint32_t instructions[] = 
+        {
+            bytecode_iconst(32),
+            bytecode_iconst(10),
+            bytecode_pop(0),
+            bytecode_pop(1),
+            bytecode_iadd(0, 1, 2),
+            bytecode_store(2, 0),
+            bytecode_push(2),
+            bytecode_halt(0)
+        };
+        int ret = cpu_execute(instructions, sizeof(instructions) / sizeof(instructions[0]),
+                memory, sizeof(memory) / sizeof(memory[0]), 0);
+
+        printf("[%d]\n", ret);
+
+        int i = 0;
+        for(; i < sizeof(memory) / sizeof(memory[0]); i++)
+        {
+            if ((i % 16) == 0)
+            {
+                printf("\n");
+            }
+            printf("%02x ", memory[i]);
+        }
+    }
+    printf("\n----------\n");
     parser_t parser_val;
     parser_t *parser = &parser_val;
     parser_init(parser);
-    printf("\n>"); 
-    char* line;
-    while ((line = read_stdin()))
+    if (execute != NULL)
     {
-        if (line != NULL)
+        uint32_t* instructions;
+        uint8_t* data;
+        uint32_t i_count;
+        uint32_t d_count;
+
+        token_t* tokens;
+        int t_count;
+        parser_process(parser, execute, &tokens, &t_count);
+
+        code_generator_generate(tokens, t_count, 
+                &instructions, &i_count,
+                &data, &d_count);
+
+        printf("ptr %p", instructions);
+
+        // TODO(sebe): copy over the data to the memory
+        // and structure the program's memory sanely
+        uint8_t memory[32];
+        d_count = 32;
+
+        int ret = cpu_execute(instructions, i_count,
+                memory, d_count, 0);
+
+        printf("[%d]\n", ret);
+
+        int i = 0;
+        for(; i < d_count; i++)
         {
-            printf("%s", line);
-            parser_process(parser, line);
+            if ((i % 16) == 0)
+            {
+                printf("\n");
+            }
+            printf("%02x ", memory[i]);
         }
+    }
+
+    if (interactive)
+    {
         printf("\n>"); 
+        char* line;
+        while ((line = read_stdin()))
+        {
+            if (line != NULL)
+            {
+                token_t* tokens;
+                int t_count;
+                printf("%s", line);
+                parser_process(parser, line, &tokens, &t_count);
+            }
+            printf("\n>"); 
+        }
     }
     parser_free(parser);
     return 0;
