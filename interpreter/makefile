@@ -4,8 +4,8 @@ OUTPUT=-o interpreter.out
 
 all: interpreter.out
 
-interpreter.out: main.o parser.o
-	$(CC) obj/main.o obj/parser.o $(OUTPUT)
+interpreter.out: main.o parser.o cpu.o
+	$(CC) obj/main.o obj/parser.o obj/cpu.o $(OUTPUT)
 
 main.o: src/main.c
 	mkdir -p obj/
@@ -14,6 +14,10 @@ main.o: src/main.c
 parser.o: src/parser.c
 	mkdir -p obj/
 	$(CC) $(CFLAGS) src/parser.c -o obj/parser.o
+
+cpu.o: src/cpu.c
+	mkdir -p obj/
+	$(CC) $(CFLAGS) src/cpu.c -o obj/cpu.o
 
 clean: 
 	rm interpreter.out
