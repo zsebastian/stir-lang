@@ -1,24 +1,26 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "../include/token.h"
+#include "../include/parser.h"
 
 char* read_stdin(void);
 
 int main(int argc, char **argv)
 {
-    token_state_t* token_state;
-    token_init(&token_state);
+    parser_t parser_val;
+    parser_t *parser = &parser_val;
+    parser_init(parser);
     printf("\n>"); 
     char* line;
     while ((line = read_stdin()))
     {
         if (line != NULL)
         {
-            token_process(token_state, line);
+            parser_process(parser, line);
         }
         printf("\n>"); 
     }
-    token_destroy(&token_state);
+    parser_free(parser);
+    return 0;
 }
 
 char* read_stdin(void) {

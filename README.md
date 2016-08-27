@@ -480,7 +480,7 @@ with a working example.
 
 This defines an absolute value function. `ifelse` is an operator that takes in 3
 values: a boolean value, and two other values. If the first value is true, it
-will push the second value onto the stack, otherwise itt will push the third
+will push the second value onto the stack, otherwise it will push the third
 value onto the stack. We can do `if... else if... else` like this:
 
 ```
@@ -493,6 +493,11 @@ value onto the stack. We can do `if... else if... else` like this:
       elseif)
     elseif)) :unit
 ```
+#### Grammar
+
+The grammar for Stir is as follows:
+
+
 
 ## TODO
 

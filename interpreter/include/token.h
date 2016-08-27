@@ -1,44 +1,47 @@
-#ifndef TOKEN_H
-#define TOKEN_H
+#ifndef TOKEN_H_
+#define TOKEN_H_
+#include <assert.h>
 
-#include <regex.h>
-
-typedef enum { INT, OPERATOR, WHITESPACE} token_type_t;
-
-typedef struct
+typedef enum TokenType
 {
-    token_type_t token_type;
-    int build_buffer_begin;
-    int build_buffer_end;
+    TOK_NONE = -1,
+    TOK_PUSH_UNIT,
+    TOK_POP_UNIT,
+    TOK_ADDITION,
+    TOK_SUBTRACTION,
+    TOK_DIVISION,
+    TOK_MULTIPLICATION,
+
+    TOK_INTEGER
+} token_type_t;
+
+typedef struct token
+{
+    token_type_t type;
+    char **full_string;
+    int index, length;
 } token_t;
 
-typedef struct
+static inline int token_is_operator(token_type_t token)
 {
-    token_t *buffer;
-    int buffer_reserve;
-    int buffer_len;
-} token_array_t;
+    assert(token != TOK_NONE);
+    switch(token)
+    {
+        case TOK_ADDITION:
+        case TOK_SUBTRACTION:
+        case TOK_DIVISION:
+        case TOK_MULTIPLICATION:
+        case TOK_PUSH_UNIT:
+        case TOK_POP_UNIT:
+            return 1;
+        default:
+            return 0;
+    }
+}
 
-typedef struct 
+static inline int token_is_operand(token_type_t token)
 {
-    token_array_t token_queue;
-    char* build_buffer;
-    int build_buffer_reserve;
-    int build_buffer_len;
-
-    token_array_t eval_stack;
-    int current_token_queue_position; //which position are we evaluating
-
-    regex_t int_regex; 
-    regex_t operator_regex; 
-    regex_t whitespace_regex; 
-    regex_t unit_regex; 
-} token_state_t;
-
-int token_init(token_state_t **state);
-
-int token_process(token_state_t *current_state, char* string);
-
-int token_destroy(token_state_t **state);
+    return !token_is_operator(token);
+}
 
 #endif
