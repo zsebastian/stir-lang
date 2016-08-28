@@ -196,69 +196,85 @@ language.
 
 A `unit` is a list of tokens that form a logical unit. Units are encased in
 parentheses: `( )`. Units are meant to enhance predicability and provability of
-a program. They make sure the stack behaves in specific ways. More specifically,
-if we "call into" a unit (and units can be viewed as anonymous functions, in
-fact can be used as such), we know what that unit will do to the stack we
-present to it. Namely it will always and only pop the top value and leave
-exactly one value back on top. Units form an identifier scope and they enforce this
-rule: 
+a program. They make sure the stack behaves in specific ways. There are many
+types of units, each with their own behaviour. The first unit is the basic unit:
 
-`(b): a -> b`
+### Basic unit
 
-Meaning that any operations performed in a unit may only pop one stack element.
-In fact it must do so. In addition it may also never pop above that element,
-under any circumstances and MUST push one stack element back onto the stack. It
-may, in theory, do nothing at all, in which case it is the `null unit`
-(literally `()`) which acts as a `stack guard`. Null units are nothing special,
-they are just a natural conclusion of unit rules. In essence, they can be viewed
-as units that pop the top value, and leave the top value back. In other words,
-it is an identity funtion. This can be expressed as:
+The basic unit simply forms a adds a value onto the stack.
 
-```
-(): a -> a
-(b) () (c): a -> b c
-( (b) () (c) )`: a -> d # d is the result of b and c, or b o c
-```
+`( expr{a} ) -> a`
 
+Meaning that any operations performed in a unit may only push one stack element.
+In fact it must do so. In addition it will never pop above it's left
+parenthesis. There is no way to feed a value into a unit. The type of the unit
+is simply the type that is pushed onto the stack at the end of it.
 
-A program form its own impicit unit, meaning that a program of Stir takes
+### Lambda unit
+
+A lamda unit is a unit that does pop above it, but may only pop one element. A
+pull unit also pushes one element onto the stack. They are rougly equivalent to
+anonymous functions in other languages. The lambda unit is a unit with
+a lamda operator (':') attached to the left parenthesis:
+
+`a :( expr ) -> expr{a}
+
+A program form its own implicit lamda unit, meaning that a program of Stir takes
 excactly one input and returns excactly one output. Of course, the input may be
 an empty tuple and the output an arbitrarily sized tuple (and vice versa ad
 infinitum) but one input and one output non-the-less. (We will deal with tuples
 and other collections later).
 
-An (non-complete) example from the previous example of sumation of natural numbers:
+### Consumer unit and Producers unit
 
-`(((5 1 +) 5 *) 2 /)`
+There are no loops in Stir. Instead, stir bases its looping completely in
+monoids (right?). If you are familiar with .net's LINQ you will understand these
+units. Consumer/Producers are linked with a stream (similar to IEnumerable in
+LINQ, but isn't). A producer takes some input and yield some output to the
+consumer. The consumer may in turn be a producers also, and yield output to
+another consumer, and so on. Typically the first consumer in a chain accepts
+some tuple that it can unzip and start yielding the elements as a producer down
+to the next consumer. The last consumer will have some transformation on the
+original tuple (that is now a stream), which it can then zip back up again into
+a new, and transformed, tuple.
 
-Here we use an abundance of parentheses to show that unit can be recursive, i.e.
-a unit can have one or many 'child' units. It also shows that we can use units
-to make our intentions clearer to the (human) reader. Of course, this many
-parentheses hardly helps. This is also not strictly speaking legal Stir, since
-the outer-most unit is a unit that takes no input (or at least does nothing with
-the input) but returns an output. We can't have that, that would unbalance the
-stack! Before we know it we have stacks running around our backyard. The point
-of a program is that it takes input, if we have no input we have no program. The
-correct (or, more correct, if we consider `5` to be the input) way to write that
-code is as follows:
+We will delve more into consumer/producer units at a later time, but syntax is
+as follows:
 
-`5 (((1 +) *) 2 /)`
+>( * 2 )>
 
+In the above example, the tuple coming in is unzipped and transformed by
+multiplying each value by 2, then zipped back up into a new tuple as output.
+Should the next token be another consumer, the output is not zipped up, but
+instead streamed into that consumer, for example:
+
+>( * 2 )>( 1 + )>
+
+A calling program may act as a producer, if so the first token must be a
+consumer unit. The program may act as a producer for the calling program also,
+if the last token is a producer unit. Programs such as these can take in lines
+from, for example, stdin and push out results from stdout. The stir runtime can
+accept any number of inputs and output. A stir program may, for example, consume 
+HTTP requests and produce responses. Or it may consume HTTP requests and produce
+database entries (We will talk more about strings later).
+
+Again, we will delve more into consumers and producers, as this is one of the
+main features of stir. Stir is a programming language for data processing, more
+than anything else.
 
 #### Identifiers
 
-That code is (sort of) legal, and it also suffices. We actually don't need
-variables to do anything useful (they are called identifiers, formally, in Stir,
-but variables are also fine). In theory any computing at all (as far as I'm
-aware, so correct me if I'm wrong) can be done with just manipulating a stack
-like this and never storing any value at all in an identifier. Of course, doing
-so would make it unreadable. This is what Stir does : ... No really, ':', is an
-operator. It's called the pull operator and what it does is it pulls in the
-value (although technically it pulls in the queue pointer, which I will go over
-shortly) into an identifier. The identifier is always defined when pulling in a
-value, and any previous identifier is either destroyed before (in the case that
-the pulls are in the same scope [unit]) or a similarily named identifier becomes
-invisible until the newly defined identifier goes out of scope.
+We actually don't need variables to do anything useful (they are called
+identifiers, formally, in Stir, but variables are also fine). In theory any
+computing at all (as far as I'm aware, so correct me if I'm wrong) can be done
+with just manipulating a stack like this and never storing any value at all in
+an identifier. However, because we don't like unreadable code stir supports
+identifiers. Identifiers are defined by the pull operator and what it does
+is it pulls in a value into an identifier. 
+
+// REVISE THIS. 
+// This is naive at best and do not reflect what happens with the vm and so on.
+// "Queue pointers" are not a valuable concept.
 
 Technically an identifer holds not the value that it pulls in, but the pointer
 to the queue location of the token that it pulls in, as well as the pointer to
@@ -541,6 +557,9 @@ expression ->
             balance--
         else if next is unaryoperator
             consume
+        else if next is voidoperator #this is the pull operator
+            consume
+            balance--
         else if next is at least one whitespace
             consume
         else
@@ -553,7 +572,15 @@ expression ->
 
 ## TODO
 
-Parser.
+Implement:
+    - identifiers
+    - units
+    - tuples
+    - floating point
+    - different sizes for signed/unsigned datatypes
+    - literal-suffixes (l, ul, u, i, b, i32, i8, u32 etc)
+    - strings
+Parser
 
 Virtual machine
     - start with a simply bytecode to get things going 

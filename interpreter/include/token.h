@@ -11,8 +11,11 @@ typedef enum TokenType
     TOK_SUBTRACTION,
     TOK_DIVISION,
     TOK_MULTIPLICATION,
+    TOK_PULL_OPERATOR,
 
-    TOK_INTEGER
+    TOK_INTEGER,
+
+    TOK_IDENTIFIER,
 } token_type_t;
 
 typedef struct token
@@ -33,6 +36,7 @@ static inline int token_is_operator(token_type_t token)
         case TOK_MULTIPLICATION:
         case TOK_PUSH_UNIT:
         case TOK_POP_UNIT:
+        case TOK_PULL_OPERATOR:
             return 1;
         default:
             return 0;

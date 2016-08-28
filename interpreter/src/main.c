@@ -14,9 +14,11 @@ int main(int argc, char **argv)
     int c;
     int interactive = 0;
     char *execute = NULL;
+    int t = 0;
+    int p = 0;
 
     parg_init(&ps);
-    while((c = parg_getopt(&ps, argc, argv, "hie:")) != -1)
+    while((c = parg_getopt(&ps, argc, argv, "pthie:")) != -1)
     {
         switch(c)
         {
@@ -29,6 +31,12 @@ int main(int argc, char **argv)
             case 'e':
                 execute = (char *)ps.optarg;
                 break;
+            case 't':
+                t++;
+                break; 
+            case 'p':
+                p++;
+                break; 
             case 'h':
                 printf("usage: stir [-i input]\n"); 
                 return EXIT_SUCCESS;
@@ -37,6 +45,7 @@ int main(int argc, char **argv)
         }
     }
 
+    if (t)
     {
         uint8_t memory[32];
 
@@ -44,11 +53,11 @@ int main(int argc, char **argv)
         {
             bytecode_iconst(32),
             bytecode_iconst(10),
-            bytecode_pop(0),
-            bytecode_pop(1),
+            bytecode_pop(0, 4),
+            bytecode_pop(1, 4),
             bytecode_iadd(0, 1, 2),
             bytecode_store(2, 0),
-            bytecode_push(2),
+            bytecode_push(2, 4),
             bytecode_halt(0)
         };
         int ret = cpu_execute(instructions, sizeof(instructions) / sizeof(instructions[0]),
@@ -92,19 +101,22 @@ int main(int argc, char **argv)
         uint8_t memory[32];
         d_count = 32;
 
-        int ret = cpu_execute(instructions, i_count,
-                memory, d_count, 0);
-
-        printf("[%d]\n", ret);
-
-        int i = 0;
-        for(; i < d_count; i++)
+        if (!p)
         {
-            if ((i % 16) == 0)
+            int ret = cpu_execute(instructions, i_count,
+                    memory, d_count, 0);
+
+            printf("[%d]\n", ret);
+
+            int i = 0;
+            for(; i < d_count; i++)
             {
-                printf("\n");
+                if ((i % 16) == 0)
+                {
+                    printf("\n");
+                }
+                printf("%02x ", memory[i]);
             }
-            printf("%02x ", memory[i]);
         }
     }
 
