@@ -6,6 +6,12 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#if 0
+#define print_function(s) printf("%s\n", s)
+#else
+#define print_function(s) 
+#endif
+
 /* returns a new copy of a that is malloced 
  */
 char *str_copy(char *a)
@@ -223,10 +229,11 @@ inline int try_tokenize(parse_job_t* job, symbol_t symbol, token_type_t token)
     return ret;
 }
 
+int sym_expression(parse_job_t* job, int balance);
 
 int sym_program(parse_job_t* job);
-int sym_expression(parse_job_t* job);
-int sym_unit(parse_job_t* job);
+int sym_basic_unit(parse_job_t* job);
+int sym_lambda_unit(parse_job_t* job);
 int sym_operand(parse_job_t* job);
 int sym_binary_operator(parse_job_t* job);
 int sym_unary_operator(parse_job_t* job);
@@ -234,8 +241,10 @@ int sym_void_operator(parse_job_t* job);
 int sym_number(parse_job_t *job);
 int sym_identifier(parse_job_t *job);
 
-int tok_push_unit(parse_job_t *job);
-int tok_pop_unit(parse_job_t *job);
+int tok_push_basic_unit(parse_job_t *job);
+int tok_pop_basic_unit(parse_job_t *job);
+int tok_push_lambda_unit(parse_job_t *job);
+int tok_pop_lambda_unit(parse_job_t *job);
 int tok_integer(parse_job_t *job);
 int tok_identifier(parse_job_t *job);
 
@@ -249,11 +258,13 @@ int term_alphabethicunderline(parse_job_t *job);
 int term_alphanumeric(parse_job_t *job);
 int term_alphanumericunderline(parse_job_t *job);
 int term_underline(parse_job_t *job);
+int term_pull_operator(parse_job_t *job);
 
 int sym_program(parse_job_t* job)
 {
+    print_function("sym_program");
     store_push(job);
-    if (one(job, sym_expression)) 
+    if (sym_expression(job, 0))
     {
         store_pop(job);
         return 1;
@@ -265,14 +276,15 @@ int sym_program(parse_job_t* job)
     return 0;
 }
 
-int sym_unit(parse_job_t* job)
+int sym_basic_unit(parse_job_t* job)
 {
+    print_function("sym_basic_unit");
     store_push(job);
-    if ((one(job, tok_push_unit) && 
+    if ((one(job, tok_push_basic_unit) && 
         skip_whitespace(job) &&
-        one(job, sym_expression) && 
+        sym_expression(job, -1) && 
         skip_whitespace(job) &&
-        one(job, tok_pop_unit)))
+        one(job, tok_pop_basic_unit)))
     {
         store_pop(job);
         return 1;
@@ -284,8 +296,31 @@ int sym_unit(parse_job_t* job)
     return 0;
 }
 
-int sym_expression(parse_job_t* job)
+int sym_lambda_unit(parse_job_t* job)
 {
+    print_function("sym_lambda_unit");
+    store_push(job);
+    if ((one(job, tok_push_lambda_unit) && 
+        skip_whitespace(job) &&
+        sym_expression(job, 0) && 
+        skip_whitespace(job) &&
+        one(job, tok_pop_lambda_unit)))
+    {
+        store_pop(job);
+        printf("LAMBDA\n");
+        return 1;
+    }
+    else
+    {
+        printf("NO LAMBDA\n");
+        store_restore(job);
+    }
+    return 0;
+}
+
+int sym_expression(parse_job_t* job, int initial_balance)
+{
+    print_function("sym_expression");
     // an expression runs for as many operands and 
     // operators as possible. The only requirement is
     // that we MUST end up with one value one the stack
@@ -294,13 +329,13 @@ int sym_expression(parse_job_t* job)
     // Without doing anything else it will not be possible
     // to parse and interpret this live without storing the
     // balance somehow.
-    int balance = 0;
+    int balance = initial_balance;
 
     store_push(job);
     while(true)
     {
         store_push(job);
-        printf("[%d] ", balance);
+        printf("[%d]\n ", balance);
         print_all_tokens(job->parser);
         if (one(job, sym_operand))
         {
@@ -316,6 +351,7 @@ int sym_expression(parse_job_t* job)
         }
         else if (one(job, sym_void_operator))
         {
+            printf("void\n");
             balance--;
         }
         else if (read(job) <= 32 && read(job) > 0)
@@ -326,8 +362,8 @@ int sym_expression(parse_job_t* job)
         else
         {
             store_restore(job);
-            printf("end [%d] ", balance);
-            if (balance != 1)
+            printf("end [%d]\n ", balance);
+            if (balance != 0)
             {
                 store_restore(job);
                 return 0;
@@ -345,11 +381,14 @@ int sym_expression(parse_job_t* job)
 
 int sym_operand(parse_job_t* job)
 {
-    return one(job, sym_unit) || one(job, tok_identifier) || one(job, tok_integer);
+    print_function("sym_operand");
+    return one(job, sym_basic_unit) || one(job, sym_lambda_unit) ||
+        one(job, tok_identifier) || one(job, tok_integer);
 }
 
 int sym_binary_operator(parse_job_t *job)
 {
+    print_function("sym_binary_operator");
     char n = read(job);
     token_type_t t;
 
@@ -378,27 +417,22 @@ int sym_binary_operator(parse_job_t *job)
 
 int sym_void_operator(parse_job_t *job)
 {
+    print_function("sym_void_operator");
+    store_push(job);
+    if (one(job, term_pull_operator) &&
+        try_tokenize(job, sym_identifier, TOK_IDENTIFIER))
+    {
+        store_pop(job);
+        return true;
+    }
+    store_restore(job);
+
     char n = read(job);
     token_type_t t;
 
     switch(n)
     {
-        case ':':
-        {
-            store_push(job);
-            next(job);
-            consume(job, TOK_PULL_OPERATOR);
-            if (try_tokenize(job, sym_identifier, TOK_IDENTIFIER))
-            {
-                store_pop(job);
-                return true;
-            }
-            else
-            {
-                store_restore(job);
-                return false;
-            }
-        } break;
+
         default:
             return false;
     }
@@ -410,6 +444,7 @@ int sym_void_operator(parse_job_t *job)
 
 int sym_unary_operator(parse_job_t *job)
 {
+    print_function("sym_unary_operator");
     char n = read(job);
     token_type_t t;
 
@@ -421,20 +456,52 @@ int sym_unary_operator(parse_job_t *job)
     next(job);
     consume(job, t);
     return true;
-
-}
-int tok_push_unit(parse_job_t* job)
-{
-    return try_tokenize(job, term_left_paren, TOK_PUSH_UNIT);
 }
 
-int tok_pop_unit(parse_job_t* job)
+int tok_push_basic_unit(parse_job_t* job)
 {
-    return try_tokenize(job, term_right_paren, TOK_POP_UNIT);
+    print_function("tok_push_basic_unit");
+    return try_tokenize(job, term_left_paren, TOK_PUSH_BASIC_UNIT);
+}
+
+int tok_pop_basic_unit(parse_job_t* job)
+{
+    print_function("tok_pop_basic_unit");
+    return try_tokenize(job, term_right_paren, TOK_POP_BASIC_UNIT);
+}
+
+int tok_push_lambda_unit(parse_job_t* job)
+{
+    print_function("tok_push_lambda_unit");
+    store_push(job);
+    if (one(job, term_pull_operator) && 
+        try_tokenize(job, term_left_paren, TOK_PUSH_LAMBDA_UNIT))
+    {
+        store_pop(job);
+        return true;
+    }
+    store_restore(job);
+    return false;
+}
+
+int tok_pop_lambda_unit(parse_job_t* job)
+{
+    print_function("tok_pop_lambda_unit");
+
+    store_push(job);
+    if (one(job, term_right_paren) && 
+        try_tokenize(job, term_pull_operator, TOK_POP_LAMBDA_UNIT))
+    {
+        store_pop(job);
+        return true;
+    }
+    store_restore(job);
+    return false;
 }
 
 int tok_integer(parse_job_t* job)
 {
+    print_function("tok_integer");
     int ret = try_tokenize(job, sym_number, TOK_INTEGER);
     return ret;
 }
@@ -442,18 +509,21 @@ int tok_integer(parse_job_t* job)
 
 int tok_identifier(parse_job_t* job)
 {
+    print_function("tok_identifier");
     int ret = try_tokenize(job, sym_identifier, TOK_IDENTIFIER);
     return ret;
 }
 
 int sym_number(parse_job_t *job)
 {
+    print_function("sym_number");
     return term_zero(job) ||
         (term_digit_excluding_zero(job) && greedy_repeat(job, term_digit));
 }
 
 int sym_identifier(parse_job_t *job)
 {
+    print_function("sym_identifier");
     store_push(job);
     if (repeat_at_least(job, term_underline, 1) && 
         one(job, term_alphanumeric) &&
@@ -483,6 +553,7 @@ int sym_identifier(parse_job_t *job)
 
 int term_left_paren(parse_job_t *job)
 {
+    print_function("term_left_paren");
     if (read(job) == '(')
     {
         next(job);
@@ -493,6 +564,7 @@ int term_left_paren(parse_job_t *job)
 
 int term_right_paren(parse_job_t *job)
 {
+    print_function("term_right_paren");
     if (read(job) == ')')
     {
         next(job);
@@ -503,6 +575,7 @@ int term_right_paren(parse_job_t *job)
 
 int term_digit_excluding_zero(parse_job_t *job)
 {
+    print_function("term_digit_excluding_zero");
     char n = read(job);
     if (n >= '1' && n <= '9')
     {
@@ -514,6 +587,7 @@ int term_digit_excluding_zero(parse_job_t *job)
 
 int term_digit(parse_job_t *job)
 {
+    print_function("term_digit");
     char n = read(job);
     if (n >= '0' && n <= '9')
     {
@@ -525,6 +599,7 @@ int term_digit(parse_job_t *job)
 
 int term_zero(parse_job_t *job)
 {
+    print_function("term_zero");
     if (read(job) == '0')
     {
         next(job);
@@ -535,6 +610,7 @@ int term_zero(parse_job_t *job)
 
 int term_alphabethic(parse_job_t *job)
 {
+    print_function("term_alphabethic");
     char n = read(job);
     if ((n >= 'a' && n <= 'z') ||
         (n >= 'A' && n <= 'Z'))
@@ -547,23 +623,39 @@ int term_alphabethic(parse_job_t *job)
 
 int term_alphanumeric(parse_job_t *job)
 {
+    print_function("term_alphanumeric");
     return (term_alphabethic(job) || term_digit(job));
 }
 
 int term_alphabethicunderline(parse_job_t *job)
 {
+    print_function("term_alphabethicunderline");
     return (term_alphabethic(job) || term_underline(job));
 }
 
 int term_alphanumericunderline(parse_job_t *job)
 {
+    print_function("term_alphanumericunderline");
     return (term_alphanumeric(job) || term_underline(job));
 }
 
 int term_underline(parse_job_t *job)
 {
+    print_function("term_underline");
     char n = read(job);
     if (n == '_')
+    {
+        next(job);
+        return true;
+    }
+    return false;
+}
+
+int term_pull_operator(parse_job_t *job)
+{
+    print_function("term_pull_operator");
+    char n = read(job);
+    if (n == ':')
     {
         next(job);
         return true;

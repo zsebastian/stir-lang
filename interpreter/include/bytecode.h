@@ -59,6 +59,12 @@
 // Sets the value on the top of the stack to ip
 #define PUSHIP 10
 
+// Push a stack frame and jump to the value in an I32 register
+#define CALL 11
+
+// Pops a stack frame and jumps back to the address pushed with CALL
+#define RET 12
+
 // Adds the values from two registers 
 // and stores the result into a register
 #define IADD 22
@@ -158,6 +164,16 @@ static inline uint32_t bytecode_puship()
 static inline uint32_t bytecode_jmp(uint8_t r0)
 {
     return _bytecode_write(JMP, 0, 0, r0, 0, 0);
+}
+
+static inline uint32_t bytecode_call(uint8_t r0)
+{
+    return _bytecode_write(CALL, 0, 0, r0, 0, 0);
+}
+
+static inline uint32_t bytecode_ret()
+{
+    return _bytecode_write(RET, 0, 0, 0, 0, 0);
 }
 
 static inline uint32_t bytecode_iadd(uint8_t r0, uint8_t r1, uint8_t r2)

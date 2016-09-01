@@ -215,15 +215,39 @@ is simply the type that is pushed onto the stack at the end of it.
 A lamda unit is a unit that does pop above it, but may only pop one element. A
 pull unit also pushes one element onto the stack. They are rougly equivalent to
 anonymous functions in other languages. The lambda unit is a unit with
-a lamda operator (':') attached to the left parenthesis:
+a pull operator (':') attached to the left and right parenthesis:
 
-`a :( expr ) -> expr{a}
+`a :( expr ): -> expr{a}
 
 A program form its own implicit lamda unit, meaning that a program of Stir takes
 excactly one input and returns excactly one output. Of course, the input may be
 an empty tuple and the output an arbitrarily sized tuple (and vice versa ad
 infinitum) but one input and one output non-the-less. (We will deal with tuples
 and other collections later).
+
+Lambda units are not executed when they are read. They must be invoked. A lambda
+unit may be stored into an identifier by attaching an identifier name
+to the right pull operator. Here is an example:
+
+#Store into an identifer and then invoke:
+```
+:(1 +):addOne
+1 addOne
+```
+
+Note that an identifier doesn't have to be attached, at least not yet. The lamda
+unit will then be pushed onto the stack as a sort of function pointer. It can
+then be stored later into an identifer, using the pull operator again:
+
+```
+:(1 +): (1 1 +) :two :addOne
+
+```
+
+This is a contrived example, but this mechanism is useful. Note that `:(1
++):addOne` is simply shorthand for `:(1 +): :addOne`.
+
+
 
 ### Consumer unit and Producers unit
 
@@ -272,63 +296,13 @@ an identifier. However, because we don't like unreadable code stir supports
 identifiers. Identifiers are defined by the pull operator and what it does
 is it pulls in a value into an identifier. 
 
-// REVISE THIS. 
-// This is naive at best and do not reflect what happens with the vm and so on.
-// "Queue pointers" are not a valuable concept.
-
-Technically an identifer holds not the value that it pulls in, but the pointer
-to the queue location of the token that it pulls in, as well as the pointer to
-its own queue location. Queue locations are what you would probably expect it to
-be, in general the index in the queue that holds the token that was pushed. So
-each time a token is pushed onto the stack, the index in the queue is stored
-with it. This brings us to another rule of the stack operators:
-
-``` 
-(: a -> a [b] 
-
-    where a and b are queue locations, and b is the queue location for the
-    initial paren token for the unit. The value of b is implied, it is not 
-    pushed.
-
-): [b] -> b
-
-    where b is the queue location for the initial paren token for the
-    unit.  
-```
-
-This is to say, that the queue location for the finalizing paren token of the
-unit is the queue location of the initial paren token. We use this fact for
-defining functions. The unit 'remembers' the queue location of the inital paren
-token. Remember that units take one input and produce one result? These two
-rules combined means that the queue location for the input is the queue location
-for the initial paren token, which just so happens to be one after the queue
-location of the input. It is 'as if' the unit never existed in the first place.
-'As if' is an intentional phrasing and means that all the interpretter or compiler
-has to do is act 'as if' it did, i.e. produce the same result that it would if
-it acctually did. 
-
-```
-(a b +) :foo # This is not legal stir.
-```
-
-Here `foo` stores the queue location of the open paren as well as the location for
-itself. In essence, the "value" of `foo` is the unit. Note that `a` and `b`
-appear to be identifiers themselves. We will expand on that. Note also that
-there is a whitespace between the close paren and the colon. This whitespace
-actually does nothing, the input is expected to be something else than
-whitespace here, and so the whitespace is ignored.
-
-Note that identifiers can also hold single values, rather than units. We define these
-simply like this:
+We touched upon identifiers earlier with lamda units. Note that identifiers can
+also hold single values, rather than lamda units. We define these simply like
+this:
 
 ```
 42 :a
 ```
-
-While technically `a` holds the two pointers encasing the token 42, this is an
-'as if' case, and an interpreter may store the value 42 in `a` (however it
-"stores" that value), because we know that `a` can not possibly hold any other
-value, whatever happens to the stack.
 
 Stir is a strongly typed language with inferred types. This means that the
 identifier must have a type. The type of the identifier is the type that would
@@ -337,15 +311,38 @@ be on top of the stack after evaluation, according to this rule:
 `Ti: i -> Ta`, where Ti is the type of the identifer, i is the evaluation of the
 identifer and Ta is the type of the value left on the stack.
 
-Writing the name of the identifer is an evaluation of that identifier. We write
-to the stack the tokens, in order, that are between the two addresses the
-identifier stores. In order to call foo on two numbers, effectively adding them,
-we could then do something like this:
+Writing the name of the identifer is an evaluation of that identifier. Here's an
+example to showcase many possible uses of identifiers:
 
 ```
-(:a :b a b +) :foo # still not legale stir
-40 2 foo
+1 :a :( :b a b +): :foo 
+40 foo
 ```
+
+This will require some thinking to understand. Let's over it. Let me write the
+stack in brackets besides the token we operate on. Let left be the top of the
+stack.
+
+        []      // Start with an empty stack
+1       [1]
+:a      []      // Declaring an identifier pops the stack and store it into the identifier
+                // hence "pull operator"
+:(      [*]     // We push the address of the the operator onto the stack here.
+
+):      [*]     // Note that nothing in the brackets is executed, and nothing new
+                //is pushed
+:foo    []      //Store the address in foo
+40      [40]    
+foo     [40]    // What happens now is the instruction pointer is set to the ':('
+
+:b      []      // Stored 40 in b
+a       [1]     // a is in scope here and has the value 1. We talk about scope
+                // later
+b       [1 40]
+\+       [41]   
+
+):              // We jump back to where we were before we invoked foo.
+
 
 Now, we already know that that is not good enough. However it makes sense. Store
 into `a` and `b` what are effectively the first top values on the stack, then

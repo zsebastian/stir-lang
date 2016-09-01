@@ -12,7 +12,8 @@
 
 typedef enum data_type
 {
-    TYPE_INT32
+    TYPE_INT32,
+    TYPE_LAMBDA
 } data_type_t;
 
 int bytesize(data_type_t type)
@@ -21,6 +22,8 @@ int bytesize(data_type_t type)
     {
         case TYPE_INT32:
             return 4;
+        case TYPE_LAMBDA:
+            return 2;
         default:
             assert(0);
     }
@@ -32,6 +35,8 @@ int is_signed(data_type_t type)
     {
         case TYPE_INT32:
             return 1;
+        case TYPE_LAMBDA:
+            return 2;
         default:
             return 0;
     }
@@ -82,7 +87,6 @@ inline void pop_instruction_address_stack(state_t* state)
     str_to_u32_destroy(old);
     kv_pop(*state->id_address_stack);
 }
-
 void consume_token(state_t* state, token_t** current_token);
 
 int code_generator_generate(token_t* tokens, int token_count,
@@ -318,7 +322,9 @@ void consume_token(state_t* state, token_t **current_token)
                 case(TYPE_INT32):
                     push_instruction(state, bytecode_iadd(REG_I32_A, REG_I32_B, REG_I32_C));
                     break;
-
+                default:
+                    printf("Can only divide to integers");
+                    return;
             }
             push_instruction(state, bytecode_push(REG_I32_C, bytesize(dt2)));
 
@@ -337,7 +343,9 @@ void consume_token(state_t* state, token_t **current_token)
                 case(TYPE_INT32):
                     push_instruction(state, bytecode_isub(REG_I32_A, REG_I32_B, REG_I32_C));
                     break;
-
+                default:
+                    printf("Can only divide to integers");
+                    return;
             }
             push_instruction(state, bytecode_push(REG_I32_C, bytesize(dt2)));
             
@@ -355,7 +363,9 @@ void consume_token(state_t* state, token_t **current_token)
                 case(TYPE_INT32):
                     push_instruction(state, bytecode_imult(REG_I32_A, REG_I32_B, REG_I32_C));
                     break;
-
+                default:
+                    printf("Can only divide to integers");
+                    return;
             }
             push_instruction(state, bytecode_push(REG_I32_C, bytesize(dt2)));
             
@@ -373,13 +383,15 @@ void consume_token(state_t* state, token_t **current_token)
                 case(TYPE_INT32):
                     push_instruction(state, bytecode_idiv(REG_I32_A, REG_I32_B, REG_I32_C));
                     break;
-
+                default:
+                    printf("Can only divide to integers");
+                    return;
             }
             push_instruction(state, bytecode_push(REG_I32_C, bytesize(dt2)));
             
             push_type(state, dt2);
         } break;
-        case (TOK_PUSH_UNIT):
+        case (TOK_PUSH_LAMBDA_UNIT):
         {
             int b = 1;
             push_instruction_address_stack(state);
@@ -389,10 +401,10 @@ void consume_token(state_t* state, token_t **current_token)
                 t++;
                 switch(t->type)
                 {
-                    case(TOK_PUSH_UNIT):
+                    case(TOK_PUSH_LAMBDA_UNIT):
                         b++;
                         break;
-                    case(TOK_POP_UNIT):
+                    case(TOK_POP_LAMBDA_UNIT):
                         b--;
                         break;
                     default:
@@ -400,17 +412,15 @@ void consume_token(state_t* state, token_t **current_token)
                 }
             }
             print_token(*t);
+            push_type(state, TYPE_LAMBDA);
             // store our pushed address so the same pop unit can set it 
             // so that it can jump out of itself.
             set_instruction_address_of_identifier(state, *t, push_instruction(state, 0));
         } break;
-        case (TOK_POP_UNIT):
+        case (TOK_POP_LAMBDA_UNIT):
         {
             data_type_t dt = pop_type(state);
-            push_instruction(state, bytecode_pop(REG_I32_A, bytesize(dt)));
-            push_instruction(state, bytecode_popip(REG_I32_B));
-            push_instruction(state, bytecode_push(REG_I32_A, bytesize(dt)));
-            push_instruction(state, bytecode_jmp(REG_I32_B));
+            push_instruction(state, bytecode_ret());
             push_type(state, dt);
 
             uint32_t address = get_instruction_address_of_identifier(state, token);
@@ -423,6 +433,7 @@ void consume_token(state_t* state, token_t **current_token)
         case (TOK_IDENTIFIER):
         {
             // Have I forgotten what units are? This doesn't work
+            pop_type(state);
             uint32_t address = get_instruction_address_of_identifier(state, token);
             push_instruction(state, bytecode_iconst(address));
             push_instruction(state, bytecode_popip(REG_I32_A));

@@ -87,6 +87,17 @@ int cpu_execute(uint32_t* instructions, int instructions_size,
                 {
                     ip = instructions + registers[r0];
                 } break;
+            case CALL:
+                {
+                    stack-=4;
+                    *((uint32_t* )stack) = (uint32_t)((ip - instructions));
+                    ip = instructions + registers[r0];
+                } break;
+            case RET:
+                {
+                    ip = (instructions + (*(uint32_t *)(stack)));
+                    stack+=4;
+                } break;
             case TOP:
                 registers[r0] = (*(uint32_t *)(stack + r1) & bitfield(r2));
                 break;
